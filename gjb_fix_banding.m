@@ -22,14 +22,16 @@
 % garrettjblair.com  |  gblair92@gmail.com
 
 %%%%%%%%%%%%%%%%%%%%% Change these to your data %%%%%%%%%%%%%%%%%%%%%
-tiffname = "C:/Users/Garrett/Desktop/test_stripes/test2.tiff";
-good_frame_ind = 850; % first use a known good frame
-bad_frames_ind = good_frame+1:nf;
+tiffname = 'C:/your/path/here/test.tiff';
+Y = sub_imread_big(tiffname); % good fast tiff reader, see bottom fnc
+[h, w, nf] = size(Y);
+good_frame_ind = 3995; % first use a known good frame
+bad_frames_ind = [good_frame_ind+1:6406];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 bad_frame           = Y(:,:,bad_frames_ind(1));
-good_frame          = Y(:,:,good_frame);
+good_frame          = Y(:,:,good_frame_ind);
 
 use_default_buffer  = true; % these values should work for most uncropped and non downsamples miniscope videos
 
@@ -40,8 +42,6 @@ quick_detect        = false; % if true uses fewer pixels biased towards the cent
 
 % load in the video
 % this might be memory intensive if you have small RAM
-Y = sub_imread_big(tiffname); % good fast tiff reader, see bottom fnc
-[h, w, nf] = size(Y);
 % you could instead load each frame when needed
 
 %% A decent way of identifying banding frames, WIP
@@ -121,7 +121,7 @@ end
 
 minoffset = 0;
 maxoffset = 2*maxbuffer;
-swap_dist = 0; % distnace to swap the image data across bands
+swap_dist = -1; % distnace to swap the image data across bands
 minswap = -5; % usually it'll be between -2 and 2
 maxswap = 5;
 
@@ -135,6 +135,8 @@ scaling_ind = 1;
 current_scale = scales(1+mod(scaling_ind, length(scales)));
 
 im_good = cat(3, good_frame, good_frame, good_frame);
+fig = figure(1337); clf
+set(fig, 'Name', 'Fix MS Banding', 'Color', [.2 .4 .4], 'Position', [188 318 1612 596])
 
 resp = 0;
 while resp ~= 113 % q to quit
@@ -143,7 +145,7 @@ while resp ~= 113 % q to quit
     
     buff_id = bufferguess(2:end) + cumsum(diff(bufferguess)>0);
     buff_id(bufferguess==0)=0;
-    figure(1);
+    figure(fig);
     clf
     
     is_buffer = linear_badframe;
@@ -183,12 +185,12 @@ while resp ~= 113 % q to quit
     
     image(im)
     axis image
-    str = sprintf('Size (left/right): %d        Offset(up/dwn): %d        Scaling(x): %1.1e        Stripe offset(</>): %i',...
+    str = sprintf('Size (left/right): %d        Offset(up/dwn): %d        Scaling(spc): %1.1e        Stripe offset(</>): %i',...
         currentbuffer, currentoffset, current_scale, swap_dist);
-    title(str)
-    str = sprintf('Controls:      Buffer Size ( up/dwn )      Buffer Offset ( left/right )      Scaling factor( x )      Stripe offset( </> )      (R)eset (Q)uit');
+    title(str, 'Color', 'w')
+    str = sprintf('Controls:      Buffer Size ( up/dwn )      Buffer Offset ( left/right )      Scaling factor( spc )      Stripe offset( </> )      (R)eset (Q)uit');
     xlabel(str)
-    set(gca, 'YTick', [], 'XTick', [])
+    set(gca, 'YTick', [], 'XTick', [], 'XColor', 'w')
     drawnow
     
     [px,py,resp]=ginput(1);
@@ -205,12 +207,12 @@ while resp ~= 113 % q to quit
         case 31 % down
             currentbuffer = currentbuffer - ceil(current_scale*maxbuffer);
             currentbuffer = max(minbuffer, currentbuffer);
-        case 122 % z - reset vals
+        case 114 % r - reset vals
             currentoffset = 8076*2; %     mean([minoffset,maxoffset]);
             currentbuffer = currentoffset; %  mean([minbuffer,maxbuffer]);
             current_scale = scales(1);
-            swap_dist     = 0;
-        case 120 % x - change scale
+            swap_dist     = -1;
+        case 32 % spc - change scale
             scaling_ind = scaling_ind+1;
             current_scale = scales(1+mod(scaling_ind, length(scales)));
         case 44 % < dec swap size
@@ -227,7 +229,8 @@ disp(currentoffset)
 
 
 %% Apply these fixes to all of the bad frames
-figure(1);
+figure(fig);
+set(fig, 'Name', 'Comparing pre-post', 'Color', [.2 .4 .4], 'Position', [558 373 853 486])
 clf
 
 bufferguess = mod(linspace(0+currentoffset, h*w+currentoffset, h*w), currentbuffer)<=(currentbuffer/2);
@@ -235,6 +238,7 @@ buff_id = bufferguess(2:end) + cumsum(diff(bufferguess)>0);
 buff_id(bufferguess==0)=0;
 Yfix = Y;
 for i = 1:1:length(bad_frames_ind)
+    %%
     im3=Y(:,:,bad_frames_ind(i));
     linear_badframe = gb_mat2vec(im3);
 
